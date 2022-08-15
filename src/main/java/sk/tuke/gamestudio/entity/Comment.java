@@ -1,16 +1,23 @@
 package sk.tuke.gamestudio.entity;
 
 
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
 import java.io.Serializable;
 import java.util.Date;
 
-
+@Entity
 public class Comment implements Serializable {
+    @Id
+    @GeneratedValue
+    private long ident;
     private String game;
     private String username;
     private String comment;
     private Date commented_on;
 
+    public Comment(){}
     public Comment(String game, String username, String comment, Date commented_on) {
         this.game = game;
         this.username = username;

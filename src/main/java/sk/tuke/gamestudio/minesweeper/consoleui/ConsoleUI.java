@@ -4,13 +4,12 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Date;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import sk.tuke.gamestudio.entity.Comment;
-import sk.tuke.gamestudio.entity.Rating;
-import sk.tuke.gamestudio.entity.Score;
+import sk.tuke.gamestudio.entity.*;
 import sk.tuke.gamestudio.minesweeper.Minesweeper;
 //import sk.tuke.gamestudio.minesweeper.UserInterface;
 //import minesweeper.core.*;
@@ -18,6 +17,9 @@ import sk.tuke.gamestudio.minesweeper.Minesweeper;
 import sk.tuke.gamestudio.minesweeper.core.Field;
 import sk.tuke.gamestudio.minesweeper.core.GameState;
 import sk.tuke.gamestudio.service.*;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 
 /**
  * Console user interface.
@@ -37,10 +39,19 @@ public class ConsoleUI implements UserInterface {
     private Settings setting;
     @Autowired
     private ScoreService scoreService;
-    @Autowired
+   @Autowired
     private CommentService commentService;
     @Autowired
     private RatingService ratingService;
+
+    @Autowired
+    private PlayerServiceJPA playerServiceJPA;
+
+    @Autowired
+    OccupationServiceJPA occupationServiceJPA;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
 
     /**
@@ -63,6 +74,61 @@ public class ConsoleUI implements UserInterface {
      */
     @Override
     public void newGameStarted(Field field) {
+        System.out.println("Please enter your name or choose from the list");
+
+//INPUT FROM USER
+        System.out.println("Please enter userName(max.128): ");
+        try {
+            String userName = readLine();
+
+            List<Player> playerlist = playerServiceJPA.getPlayersByUserName(userName);
+
+
+            for (int i = 0; i < playerlist.size(); i++)
+                System.out.println(i + " " + playerlist.get(i));
+        } catch (Exception e) {
+            System.err.print("Chyba pri nacitani" + e.getMessage());
+        }
+
+        System.out.println("Select one or insert new(enter)");
+        try {
+            String username = readLine();
+            String fullName = "";
+            String country = "";
+
+            int selfEval;
+            int occupation;
+
+            if (username.length() == 0) {
+                System.out.println("Enter Full Name (max.128)");
+                fullName = readLine();
+                System.out.println("Enter User Name (max.32)");
+                username = readLine();
+                System.out.println("Enter Country (max.32)");
+                username = readLine();
+
+                System.out.println("Enter Self Evaluation (1-10)");
+                selfEval = Integer.parseInt(readLine());
+
+
+                List<Occupation> occupationlist = occupationServiceJPA.getOccupations();
+
+
+                for (int i = 0; i < occupationlist.size(); i++)
+                    System.out.println(i + " " + occupationlist.get(i));
+                System.out.println("Select occupation from the list");
+                occupation = Integer.parseInt(readLine());
+                int temp = 0;
+
+                playerServiceJPA.addPlayer(new Player(username, fullName, selfEval, new Country(country), occupationlist.get(occupation)));
+                playerName = username;
+            } else {
+                playerName = username;
+            }
+        } catch (Exception e)  {
+            System.err.println("Chyba nacitania"+e.getMessage());
+
+        }
 
         this.field = field;
         System.out.println("Choose player level?");
@@ -93,6 +159,7 @@ public class ConsoleUI implements UserInterface {
 
         do {
             update();
+            processInput();
             if (this.field.getState() == GameState.SOLVED) {
 
                 System.out.println("Congrats, you winning");
@@ -103,13 +170,16 @@ public class ConsoleUI implements UserInterface {
                 // System.out.println("Your score is: "+ this.field.getScore());
 
                 /**SCORE AT WINING TO RECORD*/
-                Score score = new Score("minesweeper", playerName, this.field.getScore(), new Date());
+               // Score score = new Score("minesweeper", playerName, this.field.getScore(), new Date());
                 //  ScoreService scoreService1 = new ScoreServiceJDBC();
                 System.out.println("Hrac " + playerName + "Ukoncil vyhrou");
-                scoreService.addScore(score);
-                var score1 = scoreService.getBestScores("minesweeper");
+               // scoreService.addScore(score);
+                scoreService.addScore(new Score("minesweeper", playerName, this.field.getScore(), new Date()));
+System.out.println("Score added");
+
+                List<Score> score1 = scoreService.getBestScores("minesweeper");
                 System.out.println("Best scorre \n : " + score1);
-                // try {
+                 try {
                 while (true) {
 
                     System.out.println("Please enter your comment (max.1000 characters): ");
@@ -117,7 +187,7 @@ public class ConsoleUI implements UserInterface {
                     if (comment.length() <= 1000 && comment.length() > 0) {
 
                         Comment comment1 = new Comment("minesweeper", playerName, comment, new Date());
-                        // CommentService commentService1 = new CommentServiceJDBC();
+                        // CommentService commentService = new CommentServiceJDBC();
                         commentService.addComment(comment1);
 
                         var comment_list = commentService.getComments("minesweeper");
@@ -129,7 +199,7 @@ public class ConsoleUI implements UserInterface {
                         continue;
                     }
                 }
-                // }catch (Exception e) {System.out.println }
+                 }catch (Exception e) {System.out.println(e.getMessage()); }
 //Rating integration START
 
                 while (true) {
@@ -141,7 +211,7 @@ public class ConsoleUI implements UserInterface {
                         if (rating_val > 0 && rating_val < 6) {
 
                             Rating rating1 = new Rating("minesweeper", playerName, Integer.valueOf(rating), new Date());
-                            // RatingService ratingService1 = new RatingServiceJDBC();
+                           //  RatingService ratingService = new RatingServiceJDBC();
                             ratingService.setRating(rating1);
 
                             var ratings = ratingService.getAverageRating("minesweeper");
@@ -176,17 +246,17 @@ public class ConsoleUI implements UserInterface {
 
 
                 // ScoreService scoreService = new ScoreServiceJDBC();
-                var score2 = scoreService.getBestScores("minesweeper");
-                System.out.println("Best scorre \n : "+ score2);
+                List<Score> score2 = scoreService.getBestScores("minesweeper");
+                System.out.println("Best scorre \n : " + score2);
 
-                while(true) {
+                while (true) {
                     try {
                         System.out.println("Please enter your comment (max.1000 characters): ");
                         var comment = readLine();
                         if (comment.length() <= 1000 && comment.length() > 0) {
 
                             Comment comment1 = new Comment("minesweeper", playerName, comment, new Date());
-                            //  CommentService commentService1 = new CommentServiceJDBC();
+                           // CommentService commentService = new CommentServiceJDBC();
                             commentService.addComment(comment1);
 
                             var comment_list = commentService.getComments("minesweeper");
@@ -203,11 +273,12 @@ public class ConsoleUI implements UserInterface {
                 }
 
 
-               /* CommentService commentService2 = new CommentServiceJDBC();
 
-                var comment_list = commentService2.getComments("minesweeper");
+               // CommentService commentService2 = new CommentServiceJDBC();
+
+                var comment_list = commentService.getComments("minesweeper");
                 for (Comment comments : comment_list)
-                    System.out.println(comments);*/
+                    System.out.println(comments);
 
                 while (true) {
                     try {
@@ -218,7 +289,7 @@ public class ConsoleUI implements UserInterface {
                         if (rating_val > 0 && rating_val < 6) {
 
                             Rating rating1 = new Rating("minesweeper", playerName, Integer.valueOf(rating), new Date());
-                            //  RatingService ratingService1 = new RatingServiceJDBC();
+                              //RatingService ratingService = new RatingServiceJDBC();
                             ratingService.setRating(rating1);
 
                             var ratings = ratingService.getAverageRating("minesweeper");
@@ -244,7 +315,7 @@ public class ConsoleUI implements UserInterface {
             }
 
 
-            processInput();
+           // processInput();
             // throw new UnsupportedOperationException("Resolve the game state - winning or loosing condition.");
         } while (true);
     }
